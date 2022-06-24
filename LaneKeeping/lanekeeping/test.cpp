@@ -1,7 +1,3 @@
-#include <cv.h>
-#include <highgui.h>
-#include <ctype.h>
-
 #include <iostream>
 #include <tuple>
 #include <cmath> // abs() for float and double, asin()
@@ -10,6 +6,11 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 
+//ver2
+//double ymm_per_pix = 200 / 240;
+//double xmm_per_pix = 375 / 160;
+
+
 //ver3
 double ymm_per_pix = 300 / 240;
 double xmm_per_pix = 365 / 220;
@@ -17,118 +18,22 @@ double xmm_per_pix = 365 / 220;
 std::vector<cv::Point2f> SlidingWindow(cv::Mat image, cv::Rect);
 std::tuple<double, double> Polynomial(std::vector<cv::Point2f>);
 std::tuple<cv::Mat, cv::Mat> CalibMatrix();
-std::vector<cv::Point2f> FindNonZero(cv::Mat img);
 
 cv::Mat ImageCalibration(cv::Mat img);
 cv::Mat ImageBirdsEyeProcess(cv::Mat img);
 cv::Mat ImageProcessing(cv::Mat img);
-
 
 // test 
 void test_1();
 void test_2();
 void test_for_robocar();
 
-int main (int argc, char **argv)
-{	
-	CvCapture *capture = 0;
-    IplImage *frame = 0;
-    double w = 320, h = 240;
-    int c;
-    int cnt=0;
-    char fName[32];
-
-    // (1)コマンド引数によって指定された番号のカメラに対するキャプチャ構造体を作成する
-    if (argc == 1 || (argc == 2 && strlen (argv[1]) == 1 && isdigit (argv[1][0])))
-		capture = cvCreateCameraCapture (argc == 2 ? argv[1][0] - '0' : 0);
-
-  /* この設定は，利用するカメラに依存する */
-  // (2)キャプチャサイズを設定する．
-    cvSetCaptureProperty (capture, CV_CAP_PROP_FRAME_WIDTH, w);
-    cvSetCaptureProperty (capture, CV_CAP_PROP_FRAME_HEIGHT, h);
-
-    cvNamedWindow ("Capture", CV_WINDOW_AUTOSIZE);
-
-  // (3)カメラから画像をキャプチャする
-    while (1) {
-        frame = cvQueryFrame (capture);
-        cvShowImage ("Capture", frame);
-
-		// lane keeping 
-		cv::Mat img;
-		cv::Mat processed;
-
-		//img = cv::imread("image/test_4.jpg");
-
-		// calibration
-		//processed = ImageCalibration(img);
-		processed = ImageCalibration(frame);
-
-		// Perspective
-		processed = ImageBirdsEyeProcess(processed);
-
-		// Image processing
-		processed = ImageProcessing(processed);
-
-		// sliding window algorithm
-		// ver3
-		std::vector<cv::Point2f> pts = SlidingWindow(processed, cv::Rect(50, 210, 60, 30));
-
-		// Polynomial fitting
-		double poly_co, lin_co;
-		std::tie(poly_co, lin_co) = Polynomial(pts);
-
-		// Radius of curvature
-		double radius_of_curvature;
-		radius_of_curvature = std::pow((1 + std::pow(2 * poly_co * pts[3].x * xmm_per_pix + lin_co, 2)), 1.5) / std::abs(2 * poly_co);
-
-		std::cout << "--------------------------------" << std::endl;
-		std::cout << "Radius of curvature is " << radius_of_curvature << std::endl;
-
-		// have to think about the width of the car and the lane.
-		// radius_of_curvature = radius_of_curvature - 182.5;
-		radius_of_curvature = radius_of_curvature - 182.5;
-
-		// steering angle -> it has to be int
-		double steering_angle;
-		steering_angle = std::round(SteerAngle(radius_of_curvature));
-
-		std::cout << "Steering angle is " << steering_angle << std::endl;
-		std::cout << "-------------------------------" << std::endl;
-
-        c = cvWaitKey (2);
-        if (c == '\x1b')
-		{
-			break;
-		}
-        }
-
-    cvReleaseCapture (&capture);
-    cvDestroyWindow ("Capture");
-
-    return 0;
+int main() {
+	// test_1();
+	// test_2();
+	test_for_robocar();
 }
 
-std::vector<cv::Point2f> FindNonZero(cv::Mat img)
-{
-	std::vector<cv::Point2f> locations;
-	int width = img.cols;
-	int height = img.rows;
-
-	for (int i = 0; i < img.cols; i++)
-	{
-		for (int j = 0; j < img.rows; j++)
-		{
-			int intensity = img.at<unsigned char>(j, i);
-			if (intensity == 255)
-			{
-				locations.push_back(cv::Point2f(i, j));
-			}
-		}
-	}
-
-	return locations;
-}
 
 std::vector<cv::Point2f> SlidingWindow(cv::Mat image, cv::Rect window) {
 	std::vector<cv::Point2f> points;
@@ -149,12 +54,8 @@ std::vector<cv::Point2f> SlidingWindow(cv::Mat image, cv::Rect window) {
 
 		std::vector<cv::Point2f> locations;
 
-		//--------------------------------------------------------------------//
 		// Get all non-black pixels. All pixels are white in our case.
-		//cv::findNonZero(roi, locations);
-		locations = FindNonZero(roi);
-	// ------------------------------------------------//
-
+		cv::findNonZero(roi, locations);
 		float avgX = 0.0f;
 
 		// Calculate average X position
@@ -257,13 +158,13 @@ std::tuple<double, double> Polynomial(std::vector<cv::Point2f> pts)
 	for (i = 0; i <= n; i++)
 		B[i][n + 1] = Y[i];                //load the values of Y as the last column of B(Normal Matrix but augmented)
 	n = n + 1;                //n is made n+1 because the Gaussian Elimination part below was for n equations, but here n is the degree of polynomial and for n degree we get n+1 equations
-	//std::cout << "\nThe Normal(Augmented Matrix) is as follows:\n";
-	//for (i = 0; i < n; i++)            //print the Normal-augmented matrix
-	//{
-	//	for (j = 0; j <= n; j++)
-	//		std::cout << B[i][j] << std::setw(16);
-	//	std::cout << "\n";
-	//}
+	std::cout << "\nThe Normal(Augmented Matrix) is as follows:\n";
+	for (i = 0; i < n; i++)            //print the Normal-augmented matrix
+	{
+		for (j = 0; j <= n; j++)
+			std::cout << B[i][j] << std::setw(16);
+		std::cout << "\n";
+	}
 	for (i = 0; i < n; i++)                    //From now Gaussian Elimination starts(can be ignored) to solve the set of linear equations (Pivotisation)
 		for (k = i + 1; k < n; k++)
 			if (B[i][i] < B[k][i])
@@ -489,7 +390,7 @@ void test_for_robocar()
 	cv::Mat img;
 	cv::Mat processed;
 
-	img = cv::imread("image/test_4.jpg");
+	img = cv::imread("image/test_7.jpg");
 
 	// calibration
 	processed = ImageCalibration(img);
@@ -510,25 +411,22 @@ void test_for_robocar()
 
 	// Radius of curvature
 	double radius_of_curvature;
-	radius_of_curvature = std::pow((1 + std::pow(2 * poly_co * pts[3].x * xmm_per_pix + lin_co, 2)), 1.5) / std::abs(2 * poly_co);
+	radius_of_curvature = std::pow((1 + std::pow(2 * poly_co * pts[3].x * xmm_per_pix + lin_co, 2)), 1.5) / abs(2 * poly_co);
 
-	std::cout << "--------------------------------" << std::endl;
-	std::cout << "Radius of curvature is " << radius_of_curvature << std::endl;
+	std::cout << radius_of_curvature << std::endl;
 
 	// have to think about the width of the car and the lane.
 	// radius_of_curvature = radius_of_curvature - 182.5;
 	radius_of_curvature = radius_of_curvature - 182.5;
 
-	// steering angle -> it has to be int
+	// steering angle
 	double steering_angle;
-	steering_angle = std::round(SteerAngle(radius_of_curvature));
+	steering_angle = SteerAngle(radius_of_curvature);
 
-	std::cout << "Steering angle is " << steering_angle << std::endl;
-	std::cout << "-------------------------------" << std::endl;
-		
+	std::cout << steering_angle << std::endl;
+
 
 	// show test image
 	cv::imshow("test", processed);
 	cv::waitKey(0);
 }
-
