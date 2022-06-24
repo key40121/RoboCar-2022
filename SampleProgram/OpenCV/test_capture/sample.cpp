@@ -15,9 +15,13 @@ int main(int argh, char* argv[])
 {
     cv::VideoCapture cap(0);
 
-    cv::VideoCapture::set(CV_CAP_PROP_FRAME_HEIGHT=240);
-    cv::VideoCapture::set(CV_CAP_PROP_FRAME_WIDTH=320);
-    cv::VideoCapture::set(CV_CAP_PROP_FPS=30)
+    const int HEIGHT = 240;
+    const int WIDTH = 320;
+    const int FPS = 30;
+
+    cap.set(CV_CAP_PROP_FRAME_HEIGHT, HEIGHT);
+    cap.set(CV_CAP_PROP_FRAME_WIDTH, WIDTH);
+    cap.set(CV_CAP_PROP_FPS, FPS)
     
     // make sure camera is loaded
     if(!cap.isOpened())
